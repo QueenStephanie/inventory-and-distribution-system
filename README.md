@@ -121,6 +121,24 @@ Eliminates inventory shrinkage ("nawala nga manok o mantika") by strictly tracki
 - Branch-specific assignments
 - Activity tracking
 
+### 5. Inventory Adjustment System ⭐ NEW
+- Manual inventory corrections for admin
+- Complete audit trail for all adjustments
+- Reason documentation required
+- Increase or decrease stock levels
+
+### 6. Raw Materials Management ⭐ NEW
+- Add/edit/deactivate materials
+- Category management
+- Automatic inventory initialization
+- Unit of measure configuration
+
+### 7. Password Management ⭐ NEW
+- Secure password change functionality
+- User-initiated password updates
+- Minimum security requirements
+- Independent password management page
+
 ## 📁 Project Structure
 
 ```
@@ -152,16 +170,21 @@ inventory and distribution system/
 │   ├── approved_requests.php
 │   ├── dispatch_request.php
 │   ├── all_requests.php
-│   └── commissary_inventory.php
+│   ├── commissary_inventory.php
+│   └── adjust_inventory.php  # ⭐ NEW: Manual adjustments
 ├── superadmin/              # Superadmin Module
 │   ├── dashboard.php
 │   ├── variance_report.php  # CRITICAL FEATURE
 │   ├── manage_users.php
 │   ├── manage_branches.php
+│   ├── manage_materials.php # ⭐ NEW: Material management
 │   └── system_reports.php
 ├── index.php                # Login page
 ├── logout.php               # Logout handler
-└── unauthorized.php         # Access denied page
+├── change_password.php      # ⭐ NEW: Password change
+├── unauthorized.php         # Access denied page
+├── COMPLETE_SYSTEM_DOCUMENTATION.md  # ⭐ Full documentation
+└── QUICK_START_GUIDE.md     # ⭐ Quick reference
 ```
 
 ## 🎓 Panel Defense Strategy
