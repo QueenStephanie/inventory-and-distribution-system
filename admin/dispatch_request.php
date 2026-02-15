@@ -47,41 +47,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
             $materialId = $item['material_id'];
             $quantity = $item['approved_quantity'];
             
-            // Deduct from commissary inventory
-            $stmt = $conn->prepare("UPDATE inventory SET current_quantity = current_quantity - ? WHERE branch_id = ? AND material_id = ?");
-            $stmt->bind_param("dii", $quantity, $commBranchId, $materialId);
-            $stmt->execute();
-            
-            // Get previous quantity for stock movement
+            // Get previous commissary quantity BEFORE update
             $prevQuery = "SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ?";
             $stmt = $conn->prepare($prevQuery);
             $stmt->bind_param("ii", $commBranchId, $materialId);
             $stmt->execute();
             $prevQtyComm = $stmt->get_result()->fetch_assoc()['current_quantity'];
             
-            // Record commissary stock movement (dispatch)
+            // Deduct from commissary inventory
+            $stmt = $conn->prepare("UPDATE inventory SET current_quantity = current_quantity - ? WHERE branch_id = ? AND material_id = ?");
+            $stmt->bind_param("dii", $quantity, $commBranchId, $materialId);
+            $stmt->execute();
+            
+            // Calculate new commissary quantity
+            $newQtyComm = $prevQtyComm - $quantity;
+            
+            // Record commissary stock movement (dispatch) - negative quantity for deduction
+            $negQuantity = -$quantity;
             $stmt = $conn->prepare("INSERT INTO stock_movements (branch_id, material_id, movement_type, quantity, previous_quantity, new_quantity, reference_type, reference_id, performed_by, notes) 
                                    VALUES (?, ?, 'dispatch', ?, ?, ?, 'requisition', ?, ?, 'Stock dispatched to branch')");
-            $newQtyComm = $prevQtyComm;
-            $stmt->bind_param("iiiddii", $commBranchId, $materialId, $quantity, $prevQtyComm, $newQtyComm, $requestId, $user['user_id']);
+            $stmt->bind_param("iiiddii", $commBranchId, $materialId, $negQuantity, $prevQtyComm, $newQtyComm, $requestId, $user['user_id']);
             $stmt->execute();
             
-            // Add to branch inventory
-            $stmt = $conn->prepare("UPDATE inventory SET current_quantity = current_quantity + ? WHERE branch_id = ? AND material_id = ?");
-            $stmt->bind_param("dii", $quantity, $branchId, $materialId);
-            $stmt->execute();
-            
-            // Get previous quantity for branch
+            // Get previous branch quantity BEFORE update
             $prevQuery = "SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ?";
             $stmt = $conn->prepare($prevQuery);
             $stmt->bind_param("ii", $branchId, $materialId);
             $stmt->execute();
             $prevQtyBranch = $stmt->get_result()->fetch_assoc()['current_quantity'];
             
-            // Record branch stock movement (receive)
+            // Add to branch inventory
+            $stmt = $conn->prepare("UPDATE inventory SET current_quantity = current_quantity + ? WHERE branch_id = ? AND material_id = ?");
+            $stmt->bind_param("dii", $quantity, $branchId, $materialId);
+            $stmt->execute();
+            
+            // Calculate new branch quantity
+            $newQtyBranch = $prevQtyBranch + $quantity;
+            
+            // Record branch stock movement (receive) - positive quantity for addition
             $stmt = $conn->prepare("INSERT INTO stock_movements (branch_id, material_id, movement_type, quantity, previous_quantity, new_quantity, reference_type, reference_id, performed_by, notes) 
                                    VALUES (?, ?, 'receive', ?, ?, ?, 'requisition', ?, ?, 'Stock received from commissary')");
-            $newQtyBranch = $prevQtyBranch;
             $stmt->bind_param("iiiddii", $branchId, $materialId, $quantity, $prevQtyBranch, $newQtyBranch, $requestId, $user['user_id']);
             $stmt->execute();
             
