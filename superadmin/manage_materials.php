@@ -226,6 +226,7 @@ include '../includes/header.php';
                             </span>
                         </td>
                         <td>
+                            <button class="btn btn-xs btn-primary" onclick="editMaterial(<?php echo htmlspecialchars(json_encode($material)); ?>)">Edit</button>
                             <?php if ($material['status'] === 'active'): ?>
                                 <form method="POST" style="display: inline;">
                                     <input type="hidden" name="action" value="deactivate">
@@ -246,6 +247,124 @@ include '../includes/header.php';
         </table>
     </div>
 </div>
+
+<!-- Edit Material Modal -->
+<div id="editMaterialModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeEditModal()">&times;</span>
+        <h2>Edit Material</h2>
+        <form method="POST" action="" class="form-horizontal" id="editMaterialForm">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="material_id" id="edit_material_id">
+            
+            <div class="form-group">
+                <label for="edit_material_code">Material Code</label>
+                <input type="text" id="edit_material_code" class="form-control" readonly disabled>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit_material_name">Material Name *</label>
+                <input type="text" name="material_name" id="edit_material_name" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit_category">Category *</label>
+                <select name="category" id="edit_category" class="form-control" required>
+                    <option value="">Select Category</option>
+                    <option value="chicken">Chicken</option>
+                    <option value="oil">Oil</option>
+                    <option value="flour">Flour</option>
+                    <option value="spices">Spices</option>
+                    <option value="packaging">Packaging</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit_unit_of_measure">Unit of Measure *</label>
+                <input type="text" name="unit_of_measure" id="edit_unit_of_measure" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit_minimum_stock_level">Minimum Stock Level *</label>
+                <input type="number" name="minimum_stock_level" id="edit_minimum_stock_level" class="form-control" step="0.01" min="0" required>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Update Material</button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 30px;
+    border: 1px solid #888;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.modal-close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    line-height: 20px;
+    cursor: pointer;
+}
+
+.modal-close:hover,
+.modal-close:focus {
+    color: #000;
+}
+
+.form-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}
+</style>
+
+<script>
+function editMaterial(material) {
+    document.getElementById('edit_material_id').value = material.material_id;
+    document.getElementById('edit_material_code').value = material.material_code;
+    document.getElementById('edit_material_name').value = material.material_name;
+    document.getElementById('edit_category').value = material.category;
+    document.getElementById('edit_unit_of_measure').value = material.unit_of_measure;
+    document.getElementById('edit_minimum_stock_level').value = material.minimum_stock_level;
+    document.getElementById('editMaterialModal').style.display = 'block';
+}
+
+function closeEditModal() {
+    document.getElementById('editMaterialModal').style.display = 'none';
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+    const modal = document.getElementById('editMaterialModal');
+    if (event.target == modal) {
+        closeEditModal();
+    }
+}
+</script>
 
 <?php
 closeDBConnection($conn);
