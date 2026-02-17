@@ -27,17 +27,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fullName = sanitizeInput($_POST['full_name']);
         $email = sanitizeInput($_POST['email']);
         $role = $_POST['role'];
-        $branchId = $role === 'branch_user' ? intval($_POST['branch_id']) : null;
         
-        $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, email, role, branch_id) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssi", $username, $password, $fullName, $email, $role, $branchId);
-        
-        if ($stmt->execute()) {
-            $message = "User '{$username}' has been added successfully!";
-            $messageType = 'success';
-        } else {
-            $message = 'Failed to add user. Username may already exist.';
+        // Validate role is one of the allowed values
+        $allowedRoles = ['branch_user', 'admin', 'superadmin'];
+        if (!in_array($role, $allowedRoles)) {
+            $message = 'Invalid role selected.';
             $messageType = 'error';
+        } else {
+            $branchId = null;
+            if ($role === 'branch_user') {
+                $branchId = intval($_POST['branch_id'] ?? 0);
+                // Server-side: branch_user MUST have a valid branch
+                if ($branchId <= 0) {
+                    $message = 'Branch users must be assigned to a branch.';
+                    $messageType = 'error';
+                } else {
+                    // Verify the branch actually exists and is active
+                    $branchCheck = $conn->prepare("SELECT branch_id FROM branches WHERE branch_id = ? AND is_main_branch = FALSE");
+                    $branchCheck->bind_param("i", $branchId);
+                    $branchCheck->execute();
+                    if (!$branchCheck->get_result()->fetch_assoc()) {
+                        $message = 'Selected branch is invalid or does not exist.';
+                        $messageType = 'error';
+                    }
+                }
+            }
+            
+            // Only proceed with insert if no validation error
+            if ($messageType !== 'error') {
+                $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, email, role, branch_id) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("sssssi", $username, $password, $fullName, $email, $role, $branchId);
+                
+                if ($stmt->execute()) {
+                    $message = "User '{$username}' has been added successfully!";
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to add user. Username may already exist.';
+                    $messageType = 'error';
+                }
+            }
         }
     } elseif ($action === 'deactivate') {
         $userId = intval($_POST['user_id']);

@@ -167,7 +167,7 @@ This is a complete, production-ready web application for managing inventory acro
 
 ### Superadmin
 - **Username:** `superadmin`
-- **Password:** `admin123`
+- **Password:** `admin123`  
 - **Access:** Full system control
 
 ### Admin (Commissary Manager)
@@ -279,8 +279,7 @@ This is a complete, production-ready web application for managing inventory acro
 - ✅ View system reports
 - ✅ Access all branch data
 
-### 🟠 Admin (Commissary Manager/Dispatcher)
-**Operations Management**
+### 🟠 Admin (Commissary Manager/Dispatcher) **Operations Management**
 - ✅ View all branch requests
 - ✅ Approve/reject requisitions
 - ✅ Adjust request quantities

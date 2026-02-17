@@ -25,15 +25,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
     
     try {
         // Get requisition details
-        $reqQuery = "SELECT requesting_branch_id FROM stock_requisitions WHERE requisition_id = ?";
+        $reqQuery = "SELECT requesting_branch_id, status FROM stock_requisitions WHERE requisition_id = ?";
         $stmt = $conn->prepare($reqQuery);
         $stmt->bind_param("i", $requestId);
         $stmt->execute();
-        $branchId = $stmt->get_result()->fetch_assoc()['requesting_branch_id'];
+        $reqResult = $stmt->get_result()->fetch_assoc();
+        if (!$reqResult || !in_array($reqResult['status'], ['approved', 'partially_approved'])) {
+            throw new Exception('Requisition is not in an approved state.');
+        }
+        $branchId = $reqResult['requesting_branch_id'];
         
         // Get main commissary branch ID
         $commQuery = "SELECT branch_id FROM branches WHERE is_main_branch = TRUE LIMIT 1";
-        $commBranchId = $conn->query($commQuery)->fetch_assoc()['branch_id'];
+        $commResult = $conn->query($commQuery)->fetch_assoc();
+        if (!$commResult) {
+            throw new Exception('Main commissary branch not found.');
+        }
+        $commBranchId = $commResult['branch_id'];
         
         // Get approved items
         $itemsQuery = "SELECT material_id, approved_quantity, unit_of_measure FROM requisition_items WHERE requisition_id = ?";
@@ -42,17 +50,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
         $stmt->execute();
         $items = $stmt->get_result();
         
-        // Process each item
+        // --- PRE-CHECK: Verify sufficient commissary stock for ALL items before dispatching ---
+        $itemsToDispatch = [];
+        $insufficientItems = [];
         while ($item = $items->fetch_assoc()) {
             $materialId = $item['material_id'];
             $quantity = $item['approved_quantity'];
             
-            // Get previous commissary quantity BEFORE update
-            $prevQuery = "SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ?";
+            // Check commissary inventory row exists and has enough stock
+            $checkStmt = $conn->prepare("SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ?");
+            $checkStmt->bind_param("ii", $commBranchId, $materialId);
+            $checkStmt->execute();
+            $stockRow = $checkStmt->get_result()->fetch_assoc();
+            
+            if (!$stockRow) {
+                $insufficientItems[] = "Material ID {$materialId}: no inventory record in commissary";
+            } elseif ($stockRow['current_quantity'] < $quantity) {
+                $insufficientItems[] = "Material ID {$materialId}: available {$stockRow['current_quantity']}, requested {$quantity}";
+            }
+            
+            // Also verify branch inventory row exists
+            $branchCheckStmt = $conn->prepare("SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ?");
+            $branchCheckStmt->bind_param("ii", $branchId, $materialId);
+            $branchCheckStmt->execute();
+            if (!$branchCheckStmt->get_result()->fetch_assoc()) {
+                $insufficientItems[] = "Material ID {$materialId}: no inventory record for target branch";
+            }
+            
+            $itemsToDispatch[] = $item;
+        }
+        
+        if (!empty($insufficientItems)) {
+            throw new Exception('Insufficient commissary stock: ' . implode('; ', $insufficientItems));
+        }
+        
+        if (empty($itemsToDispatch)) {
+            throw new Exception('No items to dispatch for this requisition.');
+        }
+        // --- END PRE-CHECK ---
+        
+        // Process each item (stock is verified sufficient above)
+        foreach ($itemsToDispatch as $item) {
+            $materialId = $item['material_id'];
+            $quantity = $item['approved_quantity'];
+            
+            // Get previous commissary quantity BEFORE update (with row lock)
+            $prevQuery = "SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ? FOR UPDATE";
             $stmt = $conn->prepare($prevQuery);
             $stmt->bind_param("ii", $commBranchId, $materialId);
             $stmt->execute();
-            $prevQtyComm = $stmt->get_result()->fetch_assoc()['current_quantity'];
+            $commRow = $stmt->get_result()->fetch_assoc();
+            if (!$commRow || $commRow['current_quantity'] < $quantity) {
+                throw new Exception("Stock changed during dispatch for material ID {$materialId}. Aborting.");
+            }
+            $prevQtyComm = $commRow['current_quantity'];
             
             // Deduct from commissary inventory
             $stmt = $conn->prepare("UPDATE inventory SET current_quantity = current_quantity - ? WHERE branch_id = ? AND material_id = ?");
@@ -69,12 +120,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
             $stmt->bind_param("iiiddii", $commBranchId, $materialId, $negQuantity, $prevQtyComm, $newQtyComm, $requestId, $user['user_id']);
             $stmt->execute();
             
-            // Get previous branch quantity BEFORE update
-            $prevQuery = "SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ?";
+            // Get previous branch quantity BEFORE update (with row lock)
+            $prevQuery = "SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ? FOR UPDATE";
             $stmt = $conn->prepare($prevQuery);
             $stmt->bind_param("ii", $branchId, $materialId);
             $stmt->execute();
-            $prevQtyBranch = $stmt->get_result()->fetch_assoc()['current_quantity'];
+            $branchRow = $stmt->get_result()->fetch_assoc();
+            if (!$branchRow) {
+                throw new Exception("Branch inventory row missing for material ID {$materialId}.");
+            }
+            $prevQtyBranch = $branchRow['current_quantity'];
             
             // Add to branch inventory
             $stmt = $conn->prepare("UPDATE inventory SET current_quantity = current_quantity + ? WHERE branch_id = ? AND material_id = ?");
@@ -108,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
         
     } catch (Exception $e) {
         $conn->rollback();
-        $message = 'Failed to dispatch stock. Please try again.';
+        $message = 'Failed to dispatch stock: ' . htmlspecialchars($e->getMessage());
         $messageType = 'error';
         error_log("Dispatch error: " . $e->getMessage());
     }
@@ -269,8 +324,9 @@ include '../includes/header.php';
 </div>
 
 <form method="POST" action="" id="dispatchForm">
+    <input type="hidden" name="dispatch" value="1">
     <div class="form-actions">
-        <button type="submit" name="dispatch" class="btn btn-success">
+        <button type="submit" class="btn btn-success">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M0 0v16l16-8L0 0z"/>
             </svg>

@@ -28,24 +28,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
         
         try {
-            // Update requisition status
+            // Verify requisition is still pending before approving
+            $checkStmt = $conn->prepare("SELECT status FROM stock_requisitions WHERE requisition_id = ?");
+            $checkStmt->bind_param("i", $requestId);
+            $checkStmt->execute();
+            $checkResult = $checkStmt->get_result()->fetch_assoc();
+            if (!$checkResult || $checkResult['status'] !== 'pending') {
+                throw new Exception('Requisition is no longer in pending status.');
+            }
+            
+            // Update approved quantities - scoped to both item_id AND requisition_id
             $hasPartialApproval = false;
             foreach ($approvedQuantities as $itemId => $approvedQty) {
+                $itemId = intval($itemId);
                 $approvedQty = floatval($approvedQty);
+                if ($approvedQty < 0) {
+                    throw new Exception('Approved quantity cannot be negative.');
+                }
                 
-                // Get requested quantity
-                $stmt = $conn->prepare("SELECT requested_quantity FROM requisition_items WHERE item_id = ?");
-                $stmt->bind_param("i", $itemId);
+                // Get requested quantity - bind BOTH item_id and requisition_id
+                $stmt = $conn->prepare("SELECT requested_quantity FROM requisition_items WHERE item_id = ? AND requisition_id = ?");
+                $stmt->bind_param("ii", $itemId, $requestId);
                 $stmt->execute();
-                $requestedQty = $stmt->get_result()->fetch_assoc()['requested_quantity'];
+                $itemResult = $stmt->get_result()->fetch_assoc();
+                
+                // Skip unknown item IDs that don't belong to this requisition
+                if (!$itemResult) {
+                    continue;
+                }
+                
+                $requestedQty = $itemResult['requested_quantity'];
+                
+                // Cap approved quantity at requested quantity
+                if ($approvedQty > $requestedQty) {
+                    $approvedQty = $requestedQty;
+                }
                 
                 if ($approvedQty != $requestedQty) {
                     $hasPartialApproval = true;
                 }
                 
-                // Update approved quantity
-                $stmt = $conn->prepare("UPDATE requisition_items SET approved_quantity = ? WHERE item_id = ?");
-                $stmt->bind_param("di", $approvedQty, $itemId);
+                // Update approved quantity - scoped by BOTH item_id AND requisition_id
+                $stmt = $conn->prepare("UPDATE requisition_items SET approved_quantity = ? WHERE item_id = ? AND requisition_id = ?");
+                $stmt->bind_param("dii", $approvedQty, $itemId, $requestId);
                 $stmt->execute();
             }
             
