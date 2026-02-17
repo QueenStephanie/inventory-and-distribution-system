@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get all materials
-$materials = $conn->query("SELECT * FROM raw_materials ORDER BY status, category, material_name");
+$materials = $conn->query("SELECT material_id, material_code, material_name, category, unit_of_measure, minimum_stock_level, status, created_at FROM raw_materials ORDER BY status, category, material_name");
 
 include '../includes/header.php';
 ?>

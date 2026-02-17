@@ -4,6 +4,22 @@
  * Web-Based Centralized Inventory and Stock Distribution Management System
  */
 
+// Define base path - automatically detect or use environment variable
+if (!defined('BASE_PATH')) {
+    // Try to get from environment variable first
+    $basePath = getenv('BASE_URL') ?: null;
+    
+    // If not set, auto-detect from current directory structure
+    if (!$basePath) {
+        // Get the directory name from the config folder path
+        $scriptDir = str_replace('\\', '/', dirname(__DIR__));
+        $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT']);
+        $basePath = str_replace($docRoot, '', $scriptDir);
+    }
+    
+    define('BASE_PATH', $basePath);
+}
+
 // Start session with secure settings
 function startSecureSession() {
     if (session_status() === PHP_SESSION_NONE) {
@@ -46,7 +62,7 @@ function hasAnyRole($roles) {
 // Require login - redirect to login page if not logged in
 function requireLogin() {
     if (!isLoggedIn()) {
-        header("Location: /inventory and distribution system/index.php");
+        header("Location: " . BASE_PATH . "/index.php");
         exit();
     }
 }
@@ -55,7 +71,7 @@ function requireLogin() {
 function requireRole($role) {
     requireLogin();
     if (!hasRole($role)) {
-        header("Location: /inventory and distribution system/unauthorized.php");
+        header("Location: " . BASE_PATH . "/unauthorized.php");
         exit();
     }
 }
@@ -64,7 +80,7 @@ function requireRole($role) {
 function requireAnyRole($roles) {
     requireLogin();
     if (!hasAnyRole($roles)) {
-        header("Location: /inventory and distribution system/unauthorized.php");
+        header("Location: " . BASE_PATH . "/unauthorized.php");
         exit();
     }
 }
@@ -151,7 +167,7 @@ function logoutUser() {
     session_destroy();
     
     // Redirect to login page
-    header("Location: /inventory and distribution system/index.php");
+    header("Location: " . BASE_PATH . "/index.php");
     exit();
 }
 
@@ -159,18 +175,24 @@ function logoutUser() {
 function getDashboardUrl($role) {
     switch ($role) {
         case 'superadmin':
-            return '/inventory and distribution system/superadmin/dashboard.php';
+            return BASE_PATH . '/superadmin/dashboard.php';
         case 'admin':
-            return '/inventory and distribution system/admin/dashboard.php';
+            return BASE_PATH . '/admin/dashboard.php';
         case 'branch_user':
-            return '/inventory and distribution system/branch/dashboard.php';
+            return BASE_PATH . '/branch/dashboard.php';
         default:
-            return '/inventory and distribution system/index.php';
+            return BASE_PATH . '/index.php';
     }
 }
 
 // Get base URL for the application
 function getBaseUrl() {
-    return '/inventory and distribution system';
+    return BASE_PATH;
+}
+
+// Get full URL for a given path
+function getUrl($path) {
+    $path = ltrim($path, '/');
+    return BASE_PATH . '/' . $path;
 }
 ?>

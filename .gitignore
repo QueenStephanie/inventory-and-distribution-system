@@ -1,0 +1,55 @@
+# Environment Configuration
+.env
+config/database_local.php
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+error_log
+debug.log
+
+# Temporary Files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Backup Files
+*.backup
+*.bak
+*.sql.backup
+
+# Cache
+cache/
+tmp/
+
+# Uploads (if you add upload functionality later)
+uploads/*
+!uploads/.gitkeep
+
+# Vendor/Dependencies (if using Composer in future)
+vendor/
+node_modules/
+
+# System Files
+.htaccess.local
+php_errors.log
+error.log
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini

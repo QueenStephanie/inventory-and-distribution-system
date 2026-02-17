@@ -145,9 +145,10 @@ This is a complete, production-ready web application for managing inventory acro
 5. Open file: `database/schema.sql` from the project folder
 6. Copy all contents and paste into SQL tab
 7. Click "Go" to execute
+8. **For sample/test data:** Import `database/sample-data.sql` the same way
 
 ### Step 4: Verify Configuration
-1. Open `config/database.php`
+1. Open `config/database.php` (or create `.env` from `.env.example`)
 2. Verify settings:
    ```php
    DB_HOST: 'localhost'

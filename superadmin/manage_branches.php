@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get all branches
-$branches = $conn->query("SELECT * FROM branches ORDER BY is_main_branch DESC, branch_name");
+$branches = $conn->query("SELECT branch_id, branch_name, branch_location, contact_number, is_main_branch, status, created_at FROM branches ORDER BY is_main_branch DESC, branch_name");
 
 include '../includes/header.php';
 ?>
