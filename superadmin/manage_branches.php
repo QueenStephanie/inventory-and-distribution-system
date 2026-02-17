@@ -107,6 +107,14 @@ include '../includes/header.php';
     </a>
 </li>
 <li class="menu-item">
+    <a href="manage_materials.php">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M18 2H2C0.9 2 0 2.9 0 4v12c0 1.1 0.9 2 2 2h16c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm-1 13H3V5h14v10z"/>
+        </svg>
+        Manage Materials
+    </a>
+</li>
+<li class="menu-item">
     <a href="system_reports.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
             <path d="M4 2h12c1.1 0 2 0.9 2 2v12c0 1.1-0.9 2-2 2H4c-1.1 0-2-0.9-2-2V4c0-1.1 0.9-2 2-2zm0 14h4V8H4v8zm6 0h4v-6h-4v6zm6 0h4v-4h-4v4z"/>
