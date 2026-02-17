@@ -257,7 +257,7 @@ include '../includes/header.php';
     <div class="content-section">
         <h2>Requested Items</h2>
         <div class="table-responsive">
-            <table class="data-table">
+            <table class="data-table no-datatables">
                 <thead>
                     <tr>
                         <th>Code</th>

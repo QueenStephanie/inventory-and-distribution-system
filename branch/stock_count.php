@@ -149,7 +149,7 @@ include '../includes/header.php';
         </div>
 
         <div class="table-responsive">
-            <table class="data-table">
+            <table class="data-table no-datatables">
                 <thead>
                     <tr>
                         <th>Code</th>

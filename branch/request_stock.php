@@ -167,7 +167,7 @@ include '../includes/header.php';
         </div>
 
         <div class="table-responsive">
-            <table class="data-table" id="materialsTable">
+            <table class="data-table no-datatables" id="materialsTable">
                 <thead>
                     <tr>
                         <th width="50">Select</th>

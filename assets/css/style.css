@@ -818,3 +818,210 @@ select {
 strong {
     font-weight: 600;
 }
+
+/* ===== DataTables Custom Theme ===== */
+
+/* Wrapper layout */
+.dt-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.dt-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/* Search input */
+.dt-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dt-search input {
+    padding: 8px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    min-width: 220px;
+}
+
+.dt-search input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
+}
+
+/* Length menu */
+.dt-length {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.dt-length select {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    background: white;
+    transition: border-color 0.2s;
+}
+
+.dt-length select:focus {
+    border-color: var(--primary-color);
+}
+
+/* Info text */
+.dt-info {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+/* Pagination */
+.dt-paging {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dt-paging button {
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: white;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.dt-paging button:hover:not(.disabled):not(.current) {
+    background-color: var(--light-gray);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.dt-paging button.current {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    font-weight: 600;
+}
+
+.dt-paging button.disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* Sorting header icons */
+table.dataTable thead th {
+    position: relative;
+    cursor: pointer;
+    padding-right: 26px !important;
+}
+
+table.dataTable thead th.dt-orderable-none {
+    cursor: default;
+    padding-right: 12px !important;
+}
+
+/* Ensure DataTables doesn't override our base table styles */
+table.dataTable.data-table {
+    width: 100% !important;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+table.dataTable.data-table thead {
+    background-color: var(--light-gray);
+}
+
+table.dataTable.data-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--dark-color);
+    border-bottom: 2px solid var(--border-color);
+}
+
+table.dataTable.data-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+table.dataTable.data-table tbody tr:hover {
+    background-color: #f9f9f9 !important;
+}
+
+table.dataTable.data-table tbody tr.row-danger {
+    background-color: rgba(244, 67, 54, 0.05) !important;
+}
+
+table.dataTable.data-table tbody tr.row-warning {
+    background-color: rgba(255, 193, 7, 0.05) !important;
+}
+
+table.dataTable.data-table tbody tr.row-muted {
+    opacity: 0.6;
+}
+
+/* Override DataTables stripe if any */
+table.dataTable.stripe tbody tr.odd,
+table.dataTable.stripe tbody tr.even {
+    background-color: transparent;
+}
+
+/* Responsive DataTables */
+table.dataTable.dtr-inline.collapsed > tbody > tr > td.dtr-control::before,
+table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control::before {
+    background-color: var(--primary-color) !important;
+    border: none;
+}
+
+/* Hide DataTables default processing indicator styling conflicts */
+.dt-processing {
+    color: var(--primary-color);
+}
+
+/* Empty table within DataTables */
+.dataTables_empty {
+    text-align: center;
+    padding: 40px 20px !important;
+    color: var(--text-muted);
+}
+
+/* Responsive - stack on mobile */
+@media (max-width: 768px) {
+    .dt-top,
+    .dt-bottom {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .dt-search input {
+        min-width: unset;
+        width: 100%;
+    }
+    
+    .dt-paging {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+}

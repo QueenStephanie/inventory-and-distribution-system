@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Search/filter functionality for tables
+    // Search/filter functionality for tables (legacy - kept for non-DataTables tables)
     const searchInputs = document.querySelectorAll('.table-search');
     searchInputs.forEach(input => {
         input.addEventListener('keyup', function() {
@@ -152,6 +152,9 @@ document.addEventListener('DOMContentLoaded', function() {
     tooltips.forEach(element => {
         element.setAttribute('title', element.getAttribute('data-tooltip'));
     });
+
+    // Initialize DataTables on all .data-table elements (except those with .no-datatables)
+    initializeDataTables();
 });
 
 // Helper function to calculate totals
@@ -222,3 +225,78 @@ window.appFunctions = {
     showInfo,
     showConfirm
 };
+
+/**
+ * Initialize DataTables on all .data-table elements
+ * Skips tables with the .no-datatables class (form/input tables)
+ */
+function initializeDataTables() {
+    if (typeof $ === 'undefined' || typeof $.fn.dataTable === 'undefined') {
+        return;
+    }
+
+    const tables = document.querySelectorAll('.data-table:not(.no-datatables)');
+    
+    tables.forEach(function(table) {
+        // Skip tables that have no tbody rows (empty tables handled by PHP)
+        const tbody = table.querySelector('tbody');
+        if (!tbody || tbody.querySelectorAll('tr').length === 0) {
+            return;
+        }
+
+        // Detect if this is a small dashboard/detail table (few rows, no need for paging)
+        const rowCount = tbody.querySelectorAll('tr').length;
+        const isSmallTable = rowCount <= 10;
+
+        // Detect columns with action buttons to disable sorting on them
+        const headers = table.querySelectorAll('thead th');
+        const noSortColumns = [];
+        headers.forEach(function(th, index) {
+            const text = th.textContent.trim().toLowerCase();
+            if (text === 'actions' || text === 'action') {
+                noSortColumns.push(index);
+            }
+        });
+
+        // Build columnDefs for non-sortable columns
+        const columnDefs = noSortColumns.map(function(colIndex) {
+            return { orderable: false, targets: colIndex };
+        });
+
+        try {
+            $(table).DataTable({
+                paging: !isSmallTable,
+                pageLength: 10,
+                lengthMenu: [10, 25, 50, 100],
+                searching: true,
+                ordering: true,
+                info: !isSmallTable,
+                responsive: true,
+                autoWidth: false,
+                columnDefs: columnDefs,
+                language: {
+                    search: '',
+                    searchPlaceholder: 'Search...',
+                    lengthMenu: 'Show _MENU_ entries',
+                    info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+                    infoEmpty: 'No entries available',
+                    infoFiltered: '(filtered from _MAX_ total entries)',
+                    zeroRecords: 'No matching records found',
+                    emptyTable: 'No data available',
+                    paginate: {
+                        first: '«',
+                        last: '»',
+                        next: '›',
+                        previous: '‹'
+                    }
+                },
+                dom: '<"dt-top"<"dt-search"f><"dt-length"l>>rt<"dt-bottom"<"dt-info"i><"dt-paging"p>>'
+            });
+        } catch (e) {
+            console.warn('DataTables initialization failed for table:', e);
+        }
+    });
+}
+
+// Make initializeDataTables available globally
+window.initializeDataTables = initializeDataTables;
