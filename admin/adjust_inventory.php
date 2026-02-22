@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Adjust Inventory - Admin
  * Manual inventory adjustments for corrections
@@ -25,20 +26,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_adjustment']))
     $adjustmentType = $_POST['adjustment_type']; // 'add' or 'subtract'
     $quantity = floatval($_POST['quantity']);
     $reason = sanitizeInput($_POST['reason']);
-    
+
     if ($quantity <= 0) {
         $message = 'Quantity must be greater than zero.';
         $messageType = 'error';
     } else {
         $conn->begin_transaction();
-        
+
         try {
             // Get current quantity
             $stmt = $conn->prepare("SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ?");
             $stmt->bind_param("ii", $branchId, $materialId);
             $stmt->execute();
             $currentQty = $stmt->get_result()->fetch_assoc()['current_quantity'];
-            
+
             // Calculate new quantity
             if ($adjustmentType === 'add') {
                 $newQty = $currentQty + $quantity;
@@ -47,31 +48,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_adjustment']))
                 $newQty = $currentQty - $quantity;
                 $movementQty = -$quantity;
             }
-            
+
             // Check for negative inventory
             if ($newQty < 0) {
                 throw new Exception('Adjustment would result in negative inventory.');
             }
-            
+
             // Update inventory
             $stmt = $conn->prepare("UPDATE inventory SET current_quantity = ? WHERE branch_id = ? AND material_id = ?");
             $stmt->bind_param("dii", $newQty, $branchId, $materialId);
             $stmt->execute();
-            
+
             // Record stock movement
             $stmt = $conn->prepare("INSERT INTO stock_movements (branch_id, material_id, movement_type, quantity, previous_quantity, new_quantity, reference_type, performed_by, notes) 
                                    VALUES (?, ?, 'adjustment', ?, ?, ?, 'manual', ?, ?)");
             $stmt->bind_param("iidddiis", $branchId, $materialId, $movementQty, $currentQty, $newQty, $user['user_id'], $reason);
             $stmt->execute();
-            
+
             $conn->commit();
-            
+
             $message = 'Inventory has been adjusted successfully!';
             $messageType = 'success';
-            
+
             // Clear form
             $_POST = [];
-            
         } catch (Exception $e) {
             $conn->rollback();
             $message = 'Failed to adjust inventory: ' . $e->getMessage();
@@ -94,7 +94,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="dashboard.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10 0L0 8v12h7v-7h6v7h7V8L10 0z"/>
+            <path d="M10 0L0 8v12h7v-7h6v7h7V8L10 0z" />
         </svg>
         Dashboard
     </a>
@@ -102,7 +102,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="pending_requests.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M18 2H2C0.9 2 0 2.9 0 4v12c0 1.1 0.9 2 2 2h16c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm0 14H2V6h16v10z"/>
+            <path d="M18 2H2C0.9 2 0 2.9 0 4v12c0 1.1 0.9 2 2 2h16c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm0 14H2V6h16v10z" />
         </svg>
         Pending Requests
     </a>
@@ -110,7 +110,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="approved_requests.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M16 0H4C2.9 0 2 0.9 2 2v16c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V2c0-1.1-0.9-2-2-2zm-6 15l-5-5 1.41-1.41L10 12.17l6.59-6.59L18 7l-8 8z"/>
+            <path d="M16 0H4C2.9 0 2 0.9 2 2v16c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V2c0-1.1-0.9-2-2-2zm-6 15l-5-5 1.41-1.41L10 12.17l6.59-6.59L18 7l-8 8z" />
         </svg>
         Approved Requests
     </a>
@@ -118,7 +118,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="all_requests.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M17 0H3C1.9 0 1 0.9 1 2v12c0 1.1 0.9 2 2 2h11l5 4V2c0-1.1-0.9-2-2-2z"/>
+            <path d="M17 0H3C1.9 0 1 0.9 1 2v12c0 1.1 0.9 2 2 2h11l5 4V2c0-1.1-0.9-2-2-2z" />
         </svg>
         All Requests
     </a>
@@ -126,15 +126,31 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="commissary_inventory.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M2 2h16v16H2V2zm2 2v12h12V4H4z"/>
+            <path d="M2 2h16v16H2V2zm2 2v12h12V4H4z" />
         </svg>
         Commissary Inventory
+    </a>
+</li>
+<li class="menu-item">
+    <a href="manage_suppliers.php">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M16 1H4C2.9 1 2 1.9 2 3v14c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V3c0-1.1-0.9-2-2-2zM9 13H7v-2h2v2zm0-4H7V5h2v4zm4 4h-2V9h2v4zm0-6h-2V5h2v2z" />
+        </svg>
+        Manage Suppliers
+    </a>
+</li>
+<li class="menu-item">
+    <a href="procurement_orders.php">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M17 2H3C1.9 2 1 2.9 1 4v12c0 1.1 0.9 2 2 2h14c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm0 14H3V6h14v10z" />
+        </svg>
+        Procurement Orders
     </a>
 </li>
 <li class="menu-item active">
     <a href="adjust_inventory.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M17.414 2.586a2 2 0 010 2.828L8.828 14H6v-2.828l8.586-8.586a2 2 0 012.828 0zM4 16h12v2H4v-2z"/>
+            <path d="M17.414 2.586a2 2 0 010 2.828L8.828 14H6v-2.828l8.586-8.586a2 2 0 012.828 0zM4 16h12v2H4v-2z" />
         </svg>
         Adjust Inventory
     </a>
@@ -154,7 +170,7 @@ include '../includes/header.php';
 <?php endif; ?>
 
 <div class="alert alert-warning">
-    <strong>⚠️ Warning:</strong> Manual adjustments should only be made to correct errors or account for unusual circumstances. 
+    <strong>⚠️ Warning:</strong> Manual adjustments should only be made to correct errors or account for unusual circumstances.
     All adjustments are logged and auditable.
 </div>
 
@@ -165,9 +181,9 @@ include '../includes/header.php';
                 <label for="branch_id">Branch *</label>
                 <select name="branch_id" id="branch_id" class="form-control" required>
                     <option value="">Select Branch</option>
-                    <?php 
+                    <?php
                     $branches->data_seek(0);
-                    while ($branch = $branches->fetch_assoc()): 
+                    while ($branch = $branches->fetch_assoc()):
                     ?>
                         <option value="<?php echo $branch['branch_id']; ?>">
                             <?php echo htmlspecialchars($branch['branch_name']); ?>
@@ -175,14 +191,14 @@ include '../includes/header.php';
                     <?php endwhile; ?>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="material_id">Material/Product *</label>
                 <select name="material_id" id="material_id" class="form-control" required>
                     <option value="">Select Material</option>
-                    <?php 
+                    <?php
                     $materials->data_seek(0);
-                    while ($material = $materials->fetch_assoc()): 
+                    while ($material = $materials->fetch_assoc()):
                     ?>
                         <option value="<?php echo $material['material_id']; ?>">
                             <?php echo htmlspecialchars($material['material_code'] . ' - ' . $material['material_name']); ?>
@@ -201,7 +217,7 @@ include '../includes/header.php';
                     <option value="subtract">Remove Stock (Decrease)</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="quantity">Quantity *</label>
                 <input type="number" name="quantity" id="quantity" class="form-control" step="0.01" min="0.01" required>
@@ -216,7 +232,7 @@ include '../includes/header.php';
         <div class="form-actions">
             <button type="submit" name="submit_adjustment" class="btn btn-primary">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M13.854 3.646a.5.5 0 010 .708l-7 7a.5.5 0 01-.708 0l-3.5-3.5a.5.5 0 11.708-.708L6.5 10.293l6.646-6.647a.5.5 0 01.708 0z"/>
+                    <path d="M13.854 3.646a.5.5 0 010 .708l-7 7a.5.5 0 01-.708 0l-3.5-3.5a.5.5 0 11.708-.708L6.5 10.293l6.646-6.647a.5.5 0 01.708 0z" />
                 </svg>
                 Apply Adjustment
             </button>
@@ -253,28 +269,28 @@ include '../includes/header.php';
                                 ORDER BY sm.movement_date DESC
                                 LIMIT 20";
                 $history = $conn->query($historyQuery);
-                
+
                 if ($history->num_rows > 0):
                     while ($row = $history->fetch_assoc()):
                 ?>
-                    <tr>
-                        <td><?php echo formatDateTime($row['movement_date']); ?></td>
-                        <td><?php echo htmlspecialchars($row['branch_name']); ?></td>
-                        <td><?php echo htmlspecialchars($row['material_name']); ?></td>
-                        <td>
-                            <span class="badge badge-<?php echo $row['quantity'] > 0 ? 'success' : 'danger'; ?>">
-                                <?php echo $row['quantity'] > 0 ? '+' : ''; ?><?php echo formatNumber($row['quantity']); ?>
-                            </span>
-                        </td>
-                        <td><?php echo formatNumber($row['previous_quantity']); ?></td>
-                        <td><?php echo formatNumber($row['new_quantity']); ?></td>
-                        <td><?php echo htmlspecialchars($row['full_name']); ?></td>
-                        <td><?php echo htmlspecialchars($row['notes']); ?></td>
-                    </tr>
-                <?php 
+                        <tr>
+                            <td><?php echo formatDateTime($row['movement_date']); ?></td>
+                            <td><?php echo htmlspecialchars($row['branch_name']); ?></td>
+                            <td><?php echo htmlspecialchars($row['material_name']); ?></td>
+                            <td>
+                                <span class="badge badge-<?php echo $row['quantity'] > 0 ? 'success' : 'danger'; ?>">
+                                    <?php echo $row['quantity'] > 0 ? '+' : ''; ?><?php echo formatNumber($row['quantity']); ?>
+                                </span>
+                            </td>
+                            <td><?php echo formatNumber($row['previous_quantity']); ?></td>
+                            <td><?php echo formatNumber($row['new_quantity']); ?></td>
+                            <td><?php echo htmlspecialchars($row['full_name']); ?></td>
+                            <td><?php echo htmlspecialchars($row['notes']); ?></td>
+                        </tr>
+                    <?php
                     endwhile;
                 else:
-                ?>
+                    ?>
                     <tr>
                         <td colspan="8" style="text-align: center;">No adjustments found</td>
                     </tr>

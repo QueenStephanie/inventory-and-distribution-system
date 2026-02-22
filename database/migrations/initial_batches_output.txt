@@ -1,0 +1,11 @@
+=== Creating Initial Batches ===
+
+✓ Connected to database
+
+Found 14 inventory records with stock
+
+Existing batches in database: 0
+
+Creating initial batches for all inventory items...
+
+✗ ERROR: Unknown column 'quantity_received' in 'field list'

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Review & Approve Request - Admin
  * Web-Based Centralized Inventory and Stock Distribution Management System
@@ -23,10 +24,10 @@ $messageType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $approvedQuantities = $_POST['approved_quantities'] ?? [];
-    
+
     if ($action === 'approve') {
         $conn->begin_transaction();
-        
+
         try {
             // Verify requisition is still pending before approving
             $checkStmt = $conn->prepare("SELECT status FROM stock_requisitions WHERE requisition_id = ?");
@@ -36,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$checkResult || $checkResult['status'] !== 'pending') {
                 throw new Exception('Requisition is no longer in pending status.');
             }
-            
+
             // Update approved quantities - scoped to both item_id AND requisition_id
             $hasPartialApproval = false;
             foreach ($approvedQuantities as $itemId => $approvedQty) {
@@ -45,49 +46,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($approvedQty < 0) {
                     throw new Exception('Approved quantity cannot be negative.');
                 }
-                
+
                 // Get requested quantity - bind BOTH item_id and requisition_id
                 $stmt = $conn->prepare("SELECT requested_quantity FROM requisition_items WHERE item_id = ? AND requisition_id = ?");
                 $stmt->bind_param("ii", $itemId, $requestId);
                 $stmt->execute();
                 $itemResult = $stmt->get_result()->fetch_assoc();
-                
+
                 // Skip unknown item IDs that don't belong to this requisition
                 if (!$itemResult) {
                     continue;
                 }
-                
+
                 $requestedQty = $itemResult['requested_quantity'];
-                
+
                 // Cap approved quantity at requested quantity
                 if ($approvedQty > $requestedQty) {
                     $approvedQty = $requestedQty;
                 }
-                
+
                 if ($approvedQty != $requestedQty) {
                     $hasPartialApproval = true;
                 }
-                
+
                 // Update approved quantity - scoped by BOTH item_id AND requisition_id
                 $stmt = $conn->prepare("UPDATE requisition_items SET approved_quantity = ? WHERE item_id = ? AND requisition_id = ?");
                 $stmt->bind_param("dii", $approvedQty, $itemId, $requestId);
                 $stmt->execute();
             }
-            
+
             $status = $hasPartialApproval ? 'partially_approved' : 'approved';
             $stmt = $conn->prepare("UPDATE stock_requisitions SET status = ?, approved_by = ?, approval_date = NOW() WHERE requisition_id = ?");
             $stmt->bind_param("sii", $status, $user['user_id'], $requestId);
             $stmt->execute();
-            
+
             $conn->commit();
-            
+
             $message = 'Request has been approved successfully!';
             $messageType = 'success';
-            
+
             // Redirect to dispatch page
             header("Location: dispatch_request.php?id={$requestId}");
             exit();
-            
         } catch (Exception $e) {
             $conn->rollback();
             $message = 'Failed to approve request. Please try again.';
@@ -96,17 +96,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'reject') {
         $conn->begin_transaction();
-        
+
         try {
             $stmt = $conn->prepare("UPDATE stock_requisitions SET status = 'rejected', approved_by = ?, approval_date = NOW() WHERE requisition_id = ?");
             $stmt->bind_param("ii", $user['user_id'], $requestId);
             $stmt->execute();
-            
+
             $conn->commit();
-            
+
             header("Location: pending_requests.php?msg=rejected");
             exit();
-            
         } catch (Exception $e) {
             $conn->rollback();
             $message = 'Failed to reject request.';
@@ -162,7 +161,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="dashboard.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10 0L0 8v12h7v-7h6v7h7V8L10 0z"/>
+            <path d="M10 0L0 8v12h7v-7h6v7h7V8L10 0z" />
         </svg>
         Dashboard
     </a>
@@ -170,7 +169,7 @@ include '../includes/header.php';
 <li class="menu-item active">
     <a href="pending_requests.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M18 2H2C0.9 2 0 2.9 0 4v12c0 1.1 0.9 2 2 2h16c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm0 14H2V6h16v10z"/>
+            <path d="M18 2H2C0.9 2 0 2.9 0 4v12c0 1.1 0.9 2 2 2h16c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm0 14H2V6h16v10z" />
         </svg>
         Pending Requests
     </a>
@@ -178,7 +177,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="approved_requests.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M16 0H4C2.9 0 2 0.9 2 2v16c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V2c0-1.1-0.9-2-2-2zm-6 15l-5-5 1.41-1.41L10 12.17l6.59-6.59L18 7l-8 8z"/>
+            <path d="M16 0H4C2.9 0 2 0.9 2 2v16c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V2c0-1.1-0.9-2-2-2zm-6 15l-5-5 1.41-1.41L10 12.17l6.59-6.59L18 7l-8 8z" />
         </svg>
         Approved Requests
     </a>
@@ -186,7 +185,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="all_requests.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M17 0H3C1.9 0 1 0.9 1 2v12c0 1.1 0.9 2 2 2h11l5 4V2c0-1.1-0.9-2-2-2z"/>
+            <path d="M17 0H3C1.9 0 1 0.9 1 2v12c0 1.1 0.9 2 2 2h11l5 4V2c0-1.1-0.9-2-2-2z" />
         </svg>
         All Requests
     </a>
@@ -194,9 +193,25 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="commissary_inventory.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M2 2h16v16H2V2zm2 2v12h12V4H4z"/>
+            <path d="M2 2h16v16H2V2zm2 2v12h12V4H4z" />
         </svg>
         Commissary Inventory
+    </a>
+</li>
+<li class="menu-item">
+    <a href="manage_suppliers.php">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M16 1H4C2.9 1 2 1.9 2 3v14c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V3c0-1.1-0.9-2-2-2zM9 13H7v-2h2v2zm0-4H7V5h2v4zm4 4h-2V9h2v4zm0-6h-2V5h2v2z" />
+        </svg>
+        Manage Suppliers
+    </a>
+</li>
+<li class="menu-item">
+    <a href="procurement_orders.php">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M17 2H3C1.9 2 1 2.9 1 4v12c0 1.1 0.9 2 2 2h14c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm0 14H3V6h14v10z" />
+        </svg>
+        Procurement Orders
     </a>
 </li>
 
@@ -210,7 +225,7 @@ include '../includes/header.php';
     </div>
     <a href="pending_requests.php" class="btn btn-secondary">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M16 7H3.83l5.59-5.59L8 0 0 8l8 8 1.41-1.41L3.83 9H16z"/>
+            <path d="M16 7H3.83l5.59-5.59L8 0 0 8l8 8 1.41-1.41L3.83 9H16z" />
         </svg>
         Back to List
     </a>
@@ -241,10 +256,10 @@ include '../includes/header.php';
             <value><span class="badge badge-warning">Pending</span></value>
         </div>
         <?php if ($requisition['notes']): ?>
-        <div class="detail-item" style="grid-column: 1 / -1;">
-            <label>Notes from Branch</label>
-            <value><?php echo nl2br(htmlspecialchars($requisition['notes'])); ?></value>
-        </div>
+            <div class="detail-item" style="grid-column: 1 / -1;">
+                <label>Notes from Branch</label>
+                <value><?php echo nl2br(htmlspecialchars($requisition['notes'])); ?></value>
+            </div>
         <?php endif; ?>
     </div>
 </div>
@@ -270,9 +285,9 @@ include '../includes/header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php 
+                    <?php
                     $items->data_seek(0);
-                    while ($item = $items->fetch_assoc()): 
+                    while ($item = $items->fetch_assoc()):
                         $canFulfill = $item['commissary_stock'] >= $item['requested_quantity'];
                         $branchCurrentStock = $branchStock[$item['material_id']] ?? 0;
                     ?>
@@ -290,17 +305,16 @@ include '../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <input 
-                                    type="number" 
-                                    name="approved_quantities[<?php echo $item['item_id']; ?>]" 
-                                    class="form-control form-control-sm" 
-                                    min="0" 
+                                <input
+                                    type="number"
+                                    name="approved_quantities[<?php echo $item['item_id']; ?>]"
+                                    class="form-control form-control-sm"
+                                    min="0"
                                     max="<?php echo $item['commissary_stock']; ?>"
-                                    step="0.01" 
+                                    step="0.01"
                                     value="<?php echo min($item['requested_quantity'], $item['commissary_stock']); ?>"
                                     required
-                                    style="width: 120px;"
-                                >
+                                    style="width: 120px;">
                             </td>
                             <td>
                                 <button type="button" class="btn btn-xs btn-link" onclick="copyRequested(<?php echo $item['item_id']; ?>, <?php echo $item['requested_quantity']; ?>)">Use Requested</button>
@@ -315,13 +329,13 @@ include '../includes/header.php';
     <div class="form-actions">
         <button type="submit" name="action" value="approve" class="btn btn-success">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M13.5 2L6 9.5 2.5 6 0 8.5 6 14.5 16 4.5z"/>
+                <path d="M13.5 2L6 9.5 2.5 6 0 8.5 6 14.5 16 4.5z" />
             </svg>
             Approve & Proceed to Dispatch
         </button>
         <button type="submit" name="action" value="reject" class="btn btn-danger" id="rejectBtn">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 0L0 8l8 8 8-8-8-8zm4 10.5L10.5 12 8 9.5 5.5 12 4 10.5 6.5 8 4 5.5 5.5 4 8 6.5 10.5 4 12 5.5 9.5 8 12 10.5z"/>
+                <path d="M8 0L0 8l8 8 8-8-8-8zm4 10.5L10.5 12 8 9.5 5.5 12 4 10.5 6.5 8 4 5.5 5.5 4 8 6.5 10.5 4 12 5.5 9.5 8 12 10.5z" />
             </svg>
             Reject Request
         </button>
@@ -330,30 +344,30 @@ include '../includes/header.php';
 </form>
 
 <script>
-function copyRequested(itemId, quantity) {
-    const input = document.querySelector(`input[name="approved_quantities[${itemId}]"]`);
-    input.value = quantity;
-}
-
-// Handle reject button with SweetAlert2
-document.getElementById('rejectBtn').addEventListener('click', async function(e) {
-    e.preventDefault();
-    
-    const result = await Swal.fire({
-        title: 'Reject Request',
-        text: 'Are you sure you want to reject this request?',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc3545',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, reject it',
-        cancelButtonText: 'Cancel'
-    });
-    
-    if (result.isConfirmed) {
-        this.closest('form').submit();
+    function copyRequested(itemId, quantity) {
+        const input = document.querySelector(`input[name="approved_quantities[${itemId}]"]`);
+        input.value = quantity;
     }
-});
+
+    // Handle reject button with SweetAlert2
+    document.getElementById('rejectBtn').addEventListener('click', async function(e) {
+        e.preventDefault();
+
+        const result = await Swal.fire({
+            title: 'Reject Request',
+            text: 'Are you sure you want to reject this request?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, reject it',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (result.isConfirmed) {
+            this.closest('form').submit();
+        }
+    });
 </script>
 
 <?php

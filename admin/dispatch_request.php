@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Dispatch Request - Admin
  * Web-Based Centralized Inventory and Stock Distribution Management System
@@ -22,7 +23,7 @@ $messageType = '';
 // Handle dispatch
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
     $conn->begin_transaction();
-    
+
     try {
         // Get requisition details
         $reqQuery = "SELECT requesting_branch_id, status FROM stock_requisitions WHERE requisition_id = ?";
@@ -34,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
             throw new Exception('Requisition is not in an approved state.');
         }
         $branchId = $reqResult['requesting_branch_id'];
-        
+
         // Get main commissary branch ID
         $commQuery = "SELECT branch_id FROM branches WHERE is_main_branch = TRUE LIMIT 1";
         $commResult = $conn->query($commQuery)->fetch_assoc();
@@ -42,33 +43,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
             throw new Exception('Main commissary branch not found.');
         }
         $commBranchId = $commResult['branch_id'];
-        
+
         // Get approved items
         $itemsQuery = "SELECT material_id, approved_quantity, unit_of_measure FROM requisition_items WHERE requisition_id = ?";
         $stmt = $conn->prepare($itemsQuery);
         $stmt->bind_param("i", $requestId);
         $stmt->execute();
         $items = $stmt->get_result();
-        
+
         // --- PRE-CHECK: Verify sufficient commissary stock for ALL items before dispatching ---
         $itemsToDispatch = [];
         $insufficientItems = [];
         while ($item = $items->fetch_assoc()) {
             $materialId = $item['material_id'];
             $quantity = $item['approved_quantity'];
-            
+
             // Check commissary inventory row exists and has enough stock
             $checkStmt = $conn->prepare("SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ?");
             $checkStmt->bind_param("ii", $commBranchId, $materialId);
             $checkStmt->execute();
             $stockRow = $checkStmt->get_result()->fetch_assoc();
-            
+
             if (!$stockRow) {
                 $insufficientItems[] = "Material ID {$materialId}: no inventory record in commissary";
             } elseif ($stockRow['current_quantity'] < $quantity) {
                 $insufficientItems[] = "Material ID {$materialId}: available {$stockRow['current_quantity']}, requested {$quantity}";
             }
-            
+
             // Also verify branch inventory row exists
             $branchCheckStmt = $conn->prepare("SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ?");
             $branchCheckStmt->bind_param("ii", $branchId, $materialId);
@@ -76,24 +77,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
             if (!$branchCheckStmt->get_result()->fetch_assoc()) {
                 $insufficientItems[] = "Material ID {$materialId}: no inventory record for target branch";
             }
-            
+
             $itemsToDispatch[] = $item;
         }
-        
+
         if (!empty($insufficientItems)) {
             throw new Exception('Insufficient commissary stock: ' . implode('; ', $insufficientItems));
         }
-        
+
         if (empty($itemsToDispatch)) {
             throw new Exception('No items to dispatch for this requisition.');
         }
         // --- END PRE-CHECK ---
-        
+
         // Process each item (stock is verified sufficient above)
         foreach ($itemsToDispatch as $item) {
             $materialId = $item['material_id'];
             $quantity = $item['approved_quantity'];
-            
+
             // Get previous commissary quantity BEFORE update (with row lock)
             $prevQuery = "SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ? FOR UPDATE";
             $stmt = $conn->prepare($prevQuery);
@@ -104,22 +105,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
                 throw new Exception("Stock changed during dispatch for material ID {$materialId}. Aborting.");
             }
             $prevQtyComm = $commRow['current_quantity'];
-            
+
             // Deduct from commissary inventory
             $stmt = $conn->prepare("UPDATE inventory SET current_quantity = current_quantity - ? WHERE branch_id = ? AND material_id = ?");
             $stmt->bind_param("dii", $quantity, $commBranchId, $materialId);
             $stmt->execute();
-            
+
             // Calculate new commissary quantity
             $newQtyComm = $prevQtyComm - $quantity;
-            
+
             // Record commissary stock movement (dispatch) - negative quantity for deduction
             $negQuantity = -$quantity;
             $stmt = $conn->prepare("INSERT INTO stock_movements (branch_id, material_id, movement_type, quantity, previous_quantity, new_quantity, reference_type, reference_id, performed_by, notes) 
                                    VALUES (?, ?, 'dispatch', ?, ?, ?, 'requisition', ?, ?, 'Stock dispatched to branch')");
             $stmt->bind_param("iiiddii", $commBranchId, $materialId, $negQuantity, $prevQtyComm, $newQtyComm, $requestId, $user['user_id']);
             $stmt->execute();
-            
+
             // Get previous branch quantity BEFORE update (with row lock)
             $prevQuery = "SELECT current_quantity FROM inventory WHERE branch_id = ? AND material_id = ? FOR UPDATE";
             $stmt = $conn->prepare($prevQuery);
@@ -130,37 +131,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispatch'])) {
                 throw new Exception("Branch inventory row missing for material ID {$materialId}.");
             }
             $prevQtyBranch = $branchRow['current_quantity'];
-            
+
             // Add to branch inventory
             $stmt = $conn->prepare("UPDATE inventory SET current_quantity = current_quantity + ? WHERE branch_id = ? AND material_id = ?");
             $stmt->bind_param("dii", $quantity, $branchId, $materialId);
             $stmt->execute();
-            
+
             // Calculate new branch quantity
             $newQtyBranch = $prevQtyBranch + $quantity;
-            
+
             // Record branch stock movement (receive) - positive quantity for addition
             $stmt = $conn->prepare("INSERT INTO stock_movements (branch_id, material_id, movement_type, quantity, previous_quantity, new_quantity, reference_type, reference_id, performed_by, notes) 
                                    VALUES (?, ?, 'receive', ?, ?, ?, 'requisition', ?, ?, 'Stock received from commissary')");
             $stmt->bind_param("iiiddii", $branchId, $materialId, $quantity, $prevQtyBranch, $newQtyBranch, $requestId, $user['user_id']);
             $stmt->execute();
-            
+
             // Update dispatched quantity in requisition items
             $stmt = $conn->prepare("UPDATE requisition_items SET dispatched_quantity = ? WHERE requisition_id = ? AND material_id = ?");
             $stmt->bind_param("dii", $quantity, $requestId, $materialId);
             $stmt->execute();
         }
-        
+
         // Update requisition status
         $stmt = $conn->prepare("UPDATE stock_requisitions SET status = 'dispatched', dispatched_by = ?, dispatch_date = NOW() WHERE requisition_id = ?");
         $stmt->bind_param("ii", $user['user_id'], $requestId);
         $stmt->execute();
-        
+
         $conn->commit();
-        
+
         header("Location: approved_requests.php?msg=dispatched");
         exit();
-        
     } catch (Exception $e) {
         $conn->rollback();
         $message = 'Failed to dispatch stock: ' . htmlspecialchars($e->getMessage());
@@ -203,7 +203,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="dashboard.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10 0L0 8v12h7v-7h6v7h7V8L10 0z"/>
+            <path d="M10 0L0 8v12h7v-7h6v7h7V8L10 0z" />
         </svg>
         Dashboard
     </a>
@@ -211,7 +211,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="pending_requests.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M18 2H2C0.9 2 0 2.9 0 4v12c0 1.1 0.9 2 2 2h16c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm0 14H2V6h16v10z"/>
+            <path d="M18 2H2C0.9 2 0 2.9 0 4v12c0 1.1 0.9 2 2 2h16c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm0 14H2V6h16v10z" />
         </svg>
         Pending Requests
     </a>
@@ -219,7 +219,7 @@ include '../includes/header.php';
 <li class="menu-item active">
     <a href="approved_requests.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M16 0H4C2.9 0 2 0.9 2 2v16c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V2c0-1.1-0.9-2-2-2zm-6 15l-5-5 1.41-1.41L10 12.17l6.59-6.59L18 7l-8 8z"/>
+            <path d="M16 0H4C2.9 0 2 0.9 2 2v16c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V2c0-1.1-0.9-2-2-2zm-6 15l-5-5 1.41-1.41L10 12.17l6.59-6.59L18 7l-8 8z" />
         </svg>
         Approved Requests
     </a>
@@ -227,7 +227,7 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="all_requests.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M17 0H3C1.9 0 1 0.9 1 2v12c0 1.1 0.9 2 2 2h11l5 4V2c0-1.1-0.9-2-2-2z"/>
+            <path d="M17 0H3C1.9 0 1 0.9 1 2v12c0 1.1 0.9 2 2 2h11l5 4V2c0-1.1-0.9-2-2-2z" />
         </svg>
         All Requests
     </a>
@@ -235,9 +235,25 @@ include '../includes/header.php';
 <li class="menu-item">
     <a href="commissary_inventory.php">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M2 2h16v16H2V2zm2 2v12h12V4H4z"/>
+            <path d="M2 2h16v16H2V2zm2 2v12h12V4H4z" />
         </svg>
         Commissary Inventory
+    </a>
+</li>
+<li class="menu-item">
+    <a href="manage_suppliers.php">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M16 1H4C2.9 1 2 1.9 2 3v14c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V3c0-1.1-0.9-2-2-2zM9 13H7v-2h2v2zm0-4H7V5h2v4zm4 4h-2V9h2v4zm0-6h-2V5h2v2z" />
+        </svg>
+        Manage Suppliers
+    </a>
+</li>
+<li class="menu-item">
+    <a href="procurement_orders.php">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M17 2H3C1.9 2 1 2.9 1 4v12c0 1.1 0.9 2 2 2h14c1.1 0 2-0.9 2-2V4c0-1.1-0.9-2-2-2zm0 14H3V6h14v10z" />
+        </svg>
+        Procurement Orders
     </a>
 </li>
 
@@ -251,7 +267,7 @@ include '../includes/header.php';
     </div>
     <a href="approved_requests.php" class="btn btn-secondary">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M16 7H3.83l5.59-5.59L8 0 0 8l8 8 1.41-1.41L3.83 9H16z"/>
+            <path d="M16 7H3.83l5.59-5.59L8 0 0 8l8 8 1.41-1.41L3.83 9H16z" />
         </svg>
         Back to List
     </a>
@@ -328,7 +344,7 @@ include '../includes/header.php';
     <div class="form-actions">
         <button type="submit" class="btn btn-success">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M0 0v16l16-8L0 0z"/>
+                <path d="M0 0v16l16-8L0 0z" />
             </svg>
             Confirm Dispatch
         </button>
@@ -337,24 +353,24 @@ include '../includes/header.php';
 </form>
 
 <script>
-document.getElementById('dispatchForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const result = await Swal.fire({
-        title: 'Confirm Dispatch',
-        text: 'Are you sure you want to dispatch this stock? This will update inventory levels.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#FF6B35',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, dispatch it',
-        cancelButtonText: 'Cancel'
+    document.getElementById('dispatchForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const result = await Swal.fire({
+            title: 'Confirm Dispatch',
+            text: 'Are you sure you want to dispatch this stock? This will update inventory levels.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#FF6B35',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, dispatch it',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (result.isConfirmed) {
+            this.submit();
+        }
     });
-    
-    if (result.isConfirmed) {
-        this.submit();
-    }
-});
 </script>
 
 <?php
